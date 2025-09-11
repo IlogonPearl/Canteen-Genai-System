@@ -11,9 +11,8 @@ from groq import Groq   # ✅ GenAI client
 # SETUP
 # ================================
 st.set_page_config(page_title="🍔 School Canteen GenAI", layout="wide")
-st.markdown("Welcome in our Canteen Genai, Please Enjoy our Service")
+st.markdown("Welcome to our Canteen GenAI! 🍴 Ask AI for meal combos, budget tips, or feedback insights.")
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-
 
 # ================================
 # MENU DATA
@@ -126,13 +125,22 @@ with col2:
     if st.button("Ask AI"):
         if user_input:
             menu_text = ", ".join(
-                [f"{item} ({price})" for cat in menu_data.values() for item, price in cat.items()]
+                [f"{item} (₱{price})" for cat in menu_data.values() for item, price in cat.items()]
             )
+            feedback_text = "\n".join(st.session_state.feedback) if st.session_state.feedback else "No feedback yet."
+
             try:
                 response = client.chat.completions.create(
                     model="llama-3.1-8b-instant",   # ✅ Groq model
                     messages=[
-                        {"role": "system", "content": f"You are a friendly canteen assistant. The menu includes: {menu_text}. Suggest combos, budget-friendly meals, or answer naturally."},
+                        {"role": "system", "content": f"""
+                        You are a friendly school canteen assistant.
+                        Menu: {menu_text}.
+                        Feedback: {feedback_text}.
+                        - Suggest combo meals and budget-friendly options.
+                        - Answer menu questions.
+                        - Summarize what students think about items if asked.
+                        """},
                         {"role": "user", "content": user_input}
                     ]
                 )
@@ -151,36 +159,30 @@ with col2:
 
     if st.session_state.feedback:
         st.write("### 📜 Previous Feedback (Anonymous)")
-        for fb in st.session_state.feedback[-5:]:  # show last 5
+        for fb in st.session_state.feedback[-5:]:
             st.info(f"💭 {fb}")
 
-    # Most Bought Items
-    st.subheader("📊 Most Bought Items")
-    if st.session_state.orders:
-        order_counts = Counter(st.session_state.orders)
-        df = pd.DataFrame(order_counts.items(), columns=["Item", "Count"])
-
-        fig, ax = plt.subplots()
-        ax.bar(df["Item"], df["Count"])
-        ax.set_xlabel("Menu Item")
-        ax.set_ylabel("Times Ordered")
-        ax.set_title("Most Popular Menu Items")
-        st.pyplot(fig)
-    else:
-        st.info("No orders yet to display chart.")
-
-    # Sales Report
-    st.subheader("📈 Sales Report")
+    # Sales Report (₱ per item)
+    st.subheader("📈 Sales Report - Total Revenue per Item")
     if os.path.exists("receipts.csv"):
         all_receipts = pd.read_csv("receipts.csv")
-        report = all_receipts.groupby("items")["total"].sum().reset_index()
 
-        fig2, ax2 = plt.subplots()
-        ax2.bar(report["items"], report["total"])
-        ax2.set_xlabel("Menu Item")
-        ax2.set_ylabel("Total Sales (₱)")
-        ax2.set_title("Sales Report by Item")
-        st.pyplot(fig2)
+        # Expand receipts into individual items
+        rows = []
+        for _, row in all_receipts.iterrows():
+            items = row["items"].split(", ")
+            for it in items:
+                # get price from menu
+                for cat in menu_data.values():
+                    if it in cat:
+                        rows.append({"Item": it, "Total": cat[it]})
+        sales_df = pd.DataFrame(rows)
+        report = sales_df.groupby("Item")["Total"].sum().sort_values(ascending=False)
+
+        fig, ax = plt.subplots()
+        report.plot(kind="bar", ax=ax)
+        ax.set_ylabel("₱ Sales")
+        ax.set_title("Revenue per Item")
+        st.pyplot(fig)
     else:
-
         st.info("No sales recorded yet.")
