@@ -11,6 +11,7 @@ from groq import Groq   # ✅ GenAI client
 # SETUP
 # ================================
 st.set_page_config(page_title="🍔 School Canteen GenAI", layout="wide")
+st.markdown("Welcome in our Canteen Genai, Please Enjoy our Service")
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
 
@@ -181,4 +182,5 @@ with col2:
         ax2.set_title("Sales Report by Item")
         st.pyplot(fig2)
     else:
+
         st.info("No sales recorded yet.")
