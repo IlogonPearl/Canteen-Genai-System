@@ -18,10 +18,10 @@ def get_connection():
     )
 
 # ----------------- SAVE FEEDBACK -----------------
-def save_feedback(item, feedback):
+def save_feedback(item, feedback, rating):
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("INSERT INTO feedbacks (item, feedback) VALUES (%s, %s)", (item, feedback))
+    cur.execute("INSERT INTO feedbacks (item, feedback, rating) VALUES (%s, %s, %s)", (item, feedback, rating))
     conn.commit()
     cur.close()
     conn.close()
@@ -30,19 +30,19 @@ def save_feedback(item, feedback):
 def load_feedbacks():
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT item, feedback, timestamp FROM feedbacks ORDER BY timestamp DESC")
+    cur.execute("SELECT item, feedback, rating, timestamp FROM feedbacks ORDER BY timestamp DESC")
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return pd.DataFrame(rows, columns=["Item", "Feedback", "Timestamp"]) if rows else pd.DataFrame(columns=["Item", "Feedback", "Timestamp"])
+    return pd.DataFrame(rows, columns=["Item", "Feedback", "Rating", "Timestamp"]) if rows else pd.DataFrame(columns=["Item", "Feedback", "Rating", "Timestamp"])
 
 # ----------------- SAVE RECEIPT -----------------
-def save_receipt(order_id, items, total, payment_method):
+def save_receipt(order_id, items, total, payment_method, details=""):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO receipts (order_id, items, total, payment_method) VALUES (%s, %s, %s, %s)",
-        (order_id, items, total, payment_method),
+        "INSERT INTO receipts (order_id, items, total, payment_method, details) VALUES (%s, %s, %s, %s, %s)",
+        (order_id, items, total, payment_method, details),
     )
     conn.commit()
     cur.close()
@@ -52,20 +52,20 @@ def save_receipt(order_id, items, total, payment_method):
 def load_sales():
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT items, total, timestamp FROM receipts")
+    cur.execute("SELECT items, total, payment_method, timestamp FROM receipts")
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return pd.DataFrame(rows, columns=["Items", "Total", "Timestamp"]) if rows else pd.DataFrame(columns=["Items", "Total", "Timestamp"])
+    return pd.DataFrame(rows, columns=["Items", "Total", "Payment Method", "Timestamp"]) if rows else pd.DataFrame(columns=["Items", "Total", "Payment Method", "Timestamp"])
 
 # ----------------- MENU DATA -----------------
 menu_data = {
-    "Burger": 50,
-    "Fries": 30,
-    "Soda": 20,
-    "Spaghetti": 45,
-    "Chicken Meal": 80,
-    "Siomai Rice": 60,
+    "Breakfast": {"Tapsilog": 70, "Longsilog": 65, "Hotdog Meal": 50, "Omelette": 45},
+    "Lunch": {"Chicken Adobo": 90, "Pork Sinigang": 100, "Beef Caldereta": 120, "Rice": 15},
+    "Snack": {"Burger": 50, "Fries": 30, "Siomai Rice": 60, "Spaghetti": 45},
+    "Drinks": {"Soda": 20, "Iced Tea": 25, "Bottled Water": 15, "Coffee": 30},
+    "Dessert": {"Halo-Halo": 65, "Leche Flan": 40, "Ice Cream": 35},
+    "Dinner": {"Grilled Chicken": 95, "Sisig": 110, "Fried Bangus": 85, "Rice": 15},
 }
 
 # ----------------- AI CLIENT -----------------
@@ -129,25 +129,65 @@ col1, col2 = st.columns(2)
 # PLACE ORDER
 with col1:
     st.subheader("🛒 Place an Order")
-    selected_items = st.multiselect("Choose items:", list(menu_data.keys()))
-    total = sum(menu_data[item] for item in selected_items)
-    payment_method = st.radio("Payment Method", ["Cash", "Card", "E-Wallet"])
-    if st.button("Place Order"):
-        if selected_items:
+
+    # session state for cart
+    if "cart" not in st.session_state:
+        st.session_state.cart = {}
+
+    # expandable categories
+    for category, items in menu_data.items():
+        with st.expander(category, expanded=False):
+            for item, price in items.items():
+                qty = st.number_input(f"{item} - ₱{price}", min_value=0, step=1, key=f"{category}_{item}")
+                if qty > 0:
+                    st.session_state.cart[item] = qty
+                elif item in st.session_state.cart:
+                    del st.session_state.cart[item]
+
+    # show cart
+    if st.session_state.cart:
+        st.markdown("#### 🛒 Your Cart")
+        total = 0
+        for item, qty in st.session_state.cart.items():
+            price = None
+            for cat, items in menu_data.items():
+                if item in items:
+                    price = items[item]
+            subtotal = price * qty
+            total += subtotal
+            st.write(f"{item} x {qty} = ₱{subtotal}")
+
+        st.write(f"**Total: ₱{total}**")
+
+        # payment method
+        payment_method = st.radio("Payment Method", ["Cash", "Card", "E-Wallet"])
+
+        payment_details = ""
+        if payment_method == "Card":
+            card_num = st.text_input("Card Number")
+            expiry = st.text_input("Expiry Date (MM/YY)")
+            cvv = st.text_input("CVV", type="password")
+            payment_details = f"Card: {card_num}, Exp: {expiry}"
+        elif payment_method == "E-Wallet":
+            wallet_type = st.selectbox("Choose Wallet", ["GCash", "Maya", "QR Scan"])
+            payment_details = wallet_type
+
+        if st.button("Place Order"):
             order_id = f"ORD{random.randint(1000,9999)}"
-            save_receipt(order_id, ", ".join(selected_items), total, payment_method)
+            items_str = ", ".join([f"{k}x{v}" for k,v in st.session_state.cart.items()])
+            save_receipt(order_id, items_str, total, payment_method, payment_details)
             st.success(f"✅ Order placed! Order ID: {order_id} | Total: ₱{total}")
-        else:
-            st.warning("Please select at least one item.")
+            st.session_state.cart = {}
 
 # GIVE FEEDBACK
 with col2:
     st.subheader("✍️ Give Feedback")
-    feedback_item = st.selectbox("Select Item:", list(menu_data.keys()))
+    feedback_item = st.selectbox("Select Item:", [i for cat in menu_data.values() for i in cat.keys()])
+    rating = st.slider("Rate this item (1-5 stars):", 1, 5, 3)
     feedback_text = st.text_area("Your Feedback:")
     if st.button("Submit Feedback"):
         if feedback_text:
-            save_feedback(feedback_item, feedback_text)
+            save_feedback(feedback_item, feedback_text, rating)
             st.success("✅ Feedback submitted!")
         else:
             st.warning("Please write feedback before submitting.")
@@ -175,4 +215,3 @@ if not sales_df.empty:
     st.pyplot(fig)
 else:
     st.info("No sales records available yet.")
-
