@@ -63,6 +63,7 @@ def load_sales():
     return pd.DataFrame(rows, columns=["Item", "Total", "Payment Method", "Timestamp"]) \
         if rows else pd.DataFrame(columns=["Item", "Total", "Payment Method", "Timestamp"])
 
+
 # ----------------- MENU DATA -----------------
 menu_data = {
     "Breakfast": {"Tapsilog": 70, "Longsilog": 65, "Hotdog Meal": 50, "Omelette": 45},
@@ -230,3 +231,4 @@ if not sales_df.empty:
     st.pyplot(fig, use_container_width=False)
 else:
     st.info("No sales recorded yet.")
+
