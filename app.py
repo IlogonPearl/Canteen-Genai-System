@@ -207,7 +207,7 @@ if not sales_df.empty:
     st.dataframe(sales_df)
 
     # Bar chart for sales
-    sales_summary = sales_df.groupby("Items")["Total"].sum()
+    sales_summary = sales_df.groupby("items")["Total"].sum()
     fig, ax = plt.subplots(figsize = (5,5))
     sales_summary.plot(kind="bar", ax=ax)
     ax.set_ylabel("Total Sales (₱)")
@@ -215,4 +215,5 @@ if not sales_df.empty:
     st.pyplot(fig)
 else:
     st.info("No sales records available yet.")
+
 
