@@ -204,7 +204,7 @@ else:
 st.subheader("📈 Sales Report by Category")
 
 sales = load_sales()
-if sales:
+if sales and len(sales) > 0:   # ✅ safer check
     sales_df = pd.DataFrame(sales, columns=["items", "total", "timestamp"])
 
     # Map each item to its category
@@ -220,7 +220,7 @@ if sales:
     category_sales = sales_df.groupby("Category")["total"].sum().reset_index()
 
     # Plot smaller graph
-    fig, ax = plt.subplots(figsize=(4,2))  # compact graph
+    fig, ax = plt.subplots(figsize=(4,2))  # ✅ compact chart
     ax.bar(category_sales["Category"], category_sales["total"])
     ax.set_xlabel("Category")
     ax.set_ylabel("Total Sales (₱)")
@@ -228,7 +228,3 @@ if sales:
     st.pyplot(fig, use_container_width=False)
 else:
     st.info("No sales recorded yet.")
-
-
-
-
