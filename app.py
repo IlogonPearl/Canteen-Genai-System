@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import snowflake.connector
 from groq import Groq
@@ -21,7 +21,10 @@ def get_connection():
 def save_feedback(item, feedback, rating):
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("INSERT INTO feedbacks (item, feedback, rating) VALUES (%s, %s, %s)", (item, feedback, rating))
+    cur.execute(
+        "INSERT INTO feedbacks (item, feedback, rating) VALUES (%s, %s, %s)",
+        (item, feedback, rating),
+    )
     conn.commit()
     cur.close()
     conn.close()
@@ -34,7 +37,8 @@ def load_feedbacks():
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return pd.DataFrame(rows, columns=["Item", "Feedback", "Rating", "Timestamp"]) if rows else pd.DataFrame(columns=["Item", "Feedback", "Rating", "Timestamp"])
+    return pd.DataFrame(rows, columns=["item", "feedback", "rating", "timestamp"]) \
+        if rows else pd.DataFrame(columns=["item", "feedback", "rating", "timestamp"])
 
 # ----------------- SAVE RECEIPT -----------------
 def save_receipt(order_id, items, total, payment_method, details=""):
@@ -56,7 +60,8 @@ def load_sales():
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return pd.DataFrame(rows, columns=["items", "total", "payment method", "timestamp"]) if rows else pd.DataFrame(columns=["items", "total", "payment method", "timestamp"])
+    return pd.DataFrame(rows, columns=["items", "total", "payment_method", "timestamp"]) \
+        if rows else pd.DataFrame(columns=["items", "total", "payment_method", "timestamp"])
 
 # ----------------- MENU DATA -----------------
 menu_data = {
@@ -130,11 +135,9 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("🛒 Place an Order")
 
-    # session state for cart
     if "cart" not in st.session_state:
         st.session_state.cart = {}
 
-    # expandable categories
     for category, items in menu_data.items():
         with st.expander(category, expanded=False):
             for item, price in items.items():
@@ -144,7 +147,6 @@ with col1:
                 elif item in st.session_state.cart:
                     del st.session_state.cart[item]
 
-    # show cart
     if st.session_state.cart:
         st.markdown("#### 🛒 Your Cart")
         total = 0
@@ -159,7 +161,6 @@ with col1:
 
         st.write(f"**Total: ₱{total}**")
 
-        # payment method
         payment_method = st.radio("Payment Method", ["Cash", "Card", "E-Wallet"])
 
         payment_details = ""
@@ -206,14 +207,11 @@ sales_df = load_sales()
 if not sales_df.empty:
     st.dataframe(sales_df)
 
-    # Bar chart for sales
-    sales_summary = sales_df.groupby("items")["Total"].sum()
-    fig, ax = plt.subplots(figsize = (5,5))
+    sales_summary = sales_df.groupby("items")["total"].sum()
+    fig, ax = plt.subplots(figsize=(5,5))
     sales_summary.plot(kind="bar", ax=ax)
     ax.set_ylabel("Total Sales (₱)")
     ax.set_title("Sales per Item")
     st.pyplot(fig)
 else:
     st.info("No sales records available yet.")
-
-
