@@ -79,7 +79,7 @@ st.title("🏫 Canteen GenAI System")
 st.markdown("### 🤖 Canteen AI Assistant")
 
 col_left, col_mid, col_right = st.columns([1, 2, 1])
-with col_mid:
+with col_left:
     user_query = st.text_input("Ask me about menu, budget, feedback, or sales:")
     if st.button("Ask AI"):
         if user_query:
@@ -215,3 +215,4 @@ if not sales_df.empty:
     st.pyplot(fig)
 else:
     st.info("No sales records available yet.")
+
