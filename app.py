@@ -219,7 +219,7 @@ if not sales_df.empty:
         for item in items.keys()
     }
 
-    sales_df["Category"] = sales_df["Item"].map(item_to_category)
+    sales_df["Category"] = sales_df["items"].map(item_to_category)
 
     category_sales = sales_df.groupby("Category")["Total"].sum().reset_index()
 
@@ -231,6 +231,7 @@ if not sales_df.empty:
     st.pyplot(fig, use_container_width=False)
 else:
     st.info("No sales recorded yet.")
+
 
 
 
