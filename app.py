@@ -21,7 +21,10 @@ def get_connection():
 def save_feedback(item, feedback, rating):
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("INSERT INTO feedbacks (item, feedback, rating) VALUES (%s, %s, %s)", (item, feedback, rating))
+    cur.execute(
+        "INSERT INTO feedbacks (item, feedback, rating) VALUES (%s, %s, %s)",
+        (item, feedback, rating),
+    )
     conn.commit()
     cur.close()
     conn.close()
@@ -34,15 +37,16 @@ def load_feedbacks():
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return pd.DataFrame(rows, columns=["Item", "Feedback", "Rating", "Timestamp"]) if rows else pd.DataFrame(columns=["Item", "Feedback", "Rating", "Timestamp"])
+    return pd.DataFrame(rows, columns=["Item", "Feedback", "Rating", "Timestamp"]) \
+        if rows else pd.DataFrame(columns=["Item", "Feedback", "Rating", "Timestamp"])
 
 # ----------------- SAVE RECEIPT -----------------
-def save_receipt(order_id, items, total, payment_method, details=""):
+def save_receipt(order_id, item, total, payment_method, details=""):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO receipts (order_id, items, total, payment_method, details) VALUES (%s, %s, %s, %s, %s)",
-        (order_id, items, total, payment_method, details),
+        "INSERT INTO receipts (order_id, item, total, payment_method, details) VALUES (%s, %s, %s, %s, %s)",
+        (order_id, item, total, payment_method, details),
     )
     conn.commit()
     cur.close()
@@ -52,11 +56,12 @@ def save_receipt(order_id, items, total, payment_method, details=""):
 def load_sales():
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT items, total, payment_method, timestamp FROM receipts")
+    cur.execute("SELECT item, total, payment_method, timestamp FROM receipts")
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return pd.DataFrame(rows, columns=["Items", "Total", "Payment Method", "Timestamp"]) if rows else pd.DataFrame(columns=["Items", "Total", "Payment Method", "Timestamp"])
+    return pd.DataFrame(rows, columns=["Item", "Total", "Payment Method", "Timestamp"]) \
+        if rows else pd.DataFrame(columns=["Item", "Total", "Payment Method", "Timestamp"])
 
 # ----------------- MENU DATA -----------------
 menu_data = {
@@ -91,7 +96,7 @@ with col_left:
             {menu_data}
 
             SALES DATA:
-            {sales_df.to_dict() if not sales_df.empty else "No sales"}
+            {sales_df.groupby('Item')['Total'].sum().to_dict() if not sales_df.empty else "No sales"}
 
             FEEDBACK DATA:
             {feedback_df.to_dict() if not feedback_df.empty else "No feedback"}
@@ -130,11 +135,9 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("🛒 Place an Order")
 
-    # session state for cart
     if "cart" not in st.session_state:
         st.session_state.cart = {}
 
-    # expandable categories
     for category, items in menu_data.items():
         with st.expander(category, expanded=False):
             for item, price in items.items():
@@ -144,7 +147,6 @@ with col1:
                 elif item in st.session_state.cart:
                     del st.session_state.cart[item]
 
-    # show cart
     if st.session_state.cart:
         st.markdown("#### 🛒 Your Cart")
         total = 0
@@ -159,7 +161,6 @@ with col1:
 
         st.write(f"**Total: ₱{total}**")
 
-        # payment method
         payment_method = st.radio("Payment Method", ["Cash", "Card", "E-Wallet"])
 
         payment_details = ""
@@ -174,8 +175,13 @@ with col1:
 
         if st.button("Place Order"):
             order_id = f"ORD{random.randint(1000,9999)}"
-            items_str = ", ".join([f"{k}x{v}" for k,v in st.session_state.cart.items()])
-            save_receipt(order_id, items_str, total, payment_method, payment_details)
+            for item, qty in st.session_state.cart.items():
+                price = None
+                for cat, items in menu_data.items():
+                    if item in items:
+                        price = items[item]
+                subtotal = price * qty
+                save_receipt(order_id, item, subtotal, payment_method, payment_details)  # save per item
             st.success(f"✅ Order placed! Order ID: {order_id} | Total: ₱{total}")
             st.session_state.cart = {}
 
@@ -203,23 +209,19 @@ else:
 # ----------------- SALES REPORT -----------------
 st.subheader("📈 Sales Report by Category")
 
-sales_df = load_sales()   # already a DataFrame
+sales_df = load_sales()
 
 if not sales_df.empty:
-    # Map each item to its category
     item_to_category = {
         item: cat
         for cat, items in menu_data.items()
         for item in items.keys()
     }
 
-    # ✅ Use "Item" not "Items"
     sales_df["Category"] = sales_df["Item"].map(item_to_category)
 
-    # Group sales by category
     category_sales = sales_df.groupby("Category")["Total"].sum().reset_index()
 
-    # Plot smaller graph
     fig, ax = plt.subplots(figsize=(4, 2))
     ax.bar(category_sales["Category"], category_sales["Total"])
     ax.set_xlabel("Category")
