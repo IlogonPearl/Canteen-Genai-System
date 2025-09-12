@@ -1,188 +1,98 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from collections import Counter
-import qrcode
+import snowflake.connector
 import uuid
-import os
-from groq import Groq   # ✅ GenAI client
+import datetime
 
-# ================================
-# SETUP
-# ================================
-st.set_page_config(page_title="🍔 School Canteen GenAI", layout="wide")
-st.markdown("Welcome to our Canteen GenAI! 🍴 Ask AI for meal combos, budget tips, or feedback insights.")
-client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+# ----------------- CONNECT -----------------
+def get_connection():
+    return snowflake.connector.connect(
+        user=st.secrets["SNOWFLAKE_USER"],
+        password=st.secrets["SNOWFLAKE_PASSWORD"],
+        account=st.secrets["SNOWFLAKE_ACCOUNT"],
+        warehouse=st.secrets["SNOWFLAKE_WAREHOUSE"],
+        database=st.secrets["SNOWFLAKE_DATABASE"],
+        schema=st.secrets["SNOWFLAKE_SCHEMA"],
+    )
 
-# ================================
-# MENU DATA
-# ================================
-menu_data = {
-    "Breakfast": {"Pancakes": 30, "Omelette": 25, "Toast": 15},
-    "Snack": {"Burger": 50, "Spaghetti": 60, "Fries": 40, "Pizza": 250},
-    "Lunch": {"Rice": 10, "Fried Egg": 20, "Chicken Curry": 70, "Fried Chicken": 50, "Hotdog": 35},
-    "Drinks": {"Coke": 20, "Iced Tea": 25, "Bottled Water": 15, "Coffee": 20, "Milk Tea": 45},
-    "Dessert": {"Ice Cream": 30, "Cupcake": 25, "Leche Flan": 35},
-}
+# ----------------- SAVE FEEDBACK -----------------
+def save_feedback(item, feedback):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO feedbacks (item, feedback) VALUES (%s, %s)", (item, feedback))
+    conn.commit()
+    cur.close()
+    conn.close()
 
-# ================================
-# SESSION STATES
-# ================================
-if "orders" not in st.session_state:
-    st.session_state.orders = []
+# ----------------- LOAD FEEDBACK -----------------
+def load_feedbacks():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT item, feedback, timestamp FROM feedbacks ORDER BY timestamp DESC")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return pd.DataFrame(rows, columns=["Item", "Feedback", "Timestamp"])
 
-if "feedback" not in st.session_state:
-    st.session_state.feedback = []
+# ----------------- SAVE RECEIPT -----------------
+def save_receipt(order_id, items, total, payment_method):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO receipts (order_id, items, total, payment_method) VALUES (%s, %s, %s, %s)",
+        (order_id, items, total, payment_method)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
 
-if "receipts" not in st.session_state:
-    st.session_state.receipts = []
+# ----------------- LOAD SALES -----------------
+def load_sales():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT items, total, timestamp FROM receipts ORDER BY timestamp DESC")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return pd.DataFrame(rows, columns=["Items", "Total", "Timestamp"])
 
-# ================================
-# LAYOUT
-# ================================
-col1, col2 = st.columns([1, 2])
 
-# ================================
-# LEFT SIDE → MENU + CART + CHECKOUT
-# ================================
-with col1:
-    st.header("🔍 Search Menu")
+# ----------------- STREAMLIT UI -----------------
+st.title("🍽️ Canteen Ordering System with Snowflake")
 
-    filter_category = st.text_input("Enter category (Breakfast, Snack, Lunch, Drinks, Dessert):").capitalize()
-    if filter_category in menu_data:
-        st.subheader(f"{filter_category} Menu")
-        for item, price in menu_data[filter_category].items():
-            if st.button(f"Add {item} - ₱{price}"):
-                st.session_state.orders.append(item)
-                st.success(f"{item} added to order ✅")
+# --- Place Order ---
+st.header("📌 Place an Order")
+menu_items = ["Burger", "Fries", "Soda", "Pizza", "Pasta"]
+selected_items = st.multiselect("Select items:", menu_items)
+payment_method = st.selectbox("Payment Method", ["Cash", "Card", "E-Wallet"])
 
-    st.subheader("🛒 Your Order")
-    if st.session_state.orders:
-        order_counts = Counter(st.session_state.orders)
-        total = 0
-        for item, count in order_counts.items():
-            price = None
-            for category in menu_data.values():
-                if item in category:
-                    price = category[item]
-            if price:
-                st.write(f"{item} x{count} = ₱{price * count}")
-                total += price * count
-
-        st.write(f"### 💵 Total = ₱{total}")
-
-        # Remove item
-        remove_item = st.selectbox("Select item to remove:", [""] + list(order_counts.keys()))
-        if st.button("Remove Item") and remove_item:
-            st.session_state.orders.remove(remove_item)
-            st.warning(f"{remove_item} removed from order ❌")
-
-        # Replace item
-        replace_item = st.selectbox("Select item to replace:", [""] + list(order_counts.keys()))
-        new_item = st.selectbox("Replace with:", [""] + [i for c in menu_data.values() for i in c])
-        if st.button("Replace Item") and replace_item and new_item:
-            idx = st.session_state.orders.index(replace_item)
-            st.session_state.orders[idx] = new_item
-            st.info(f"{replace_item} replaced with {new_item} 🔄")
-
-        # Checkout
-        st.subheader("💳 Checkout")
-        payment_method = st.radio("Choose Payment Method:", ["Cash", "Online"])
-
-        if st.button("Proceed to Payment"):
-            order_id = str(uuid.uuid4())[:8]
-            receipt_text = f"Order ID: {order_id}\nItems: {st.session_state.orders}\nTotal: ₱{total}\nPayment: {payment_method}"
-
-            if payment_method == "Cash":
-                qr = qrcode.make(receipt_text)
-                qr_path = f"receipt_{order_id}.png"
-                qr.save(qr_path)
-                st.image(qr_path, caption="📷 Show this QR at the counter")
-            else:
-                st.success("✅ Payment completed online!")
-                st.text(receipt_text)
-
-            # Save receipt
-            st.session_state.receipts.append({
-                "order_id": order_id,
-                "items": ", ".join(st.session_state.orders),
-                "total": total,
-                "payment_method": payment_method,
-            })
-            pd.DataFrame(st.session_state.receipts).to_csv("receipts.csv", index=False)
-            st.success("📄 Receipt generated and saved!")
-
+if st.button("Checkout"):
+    if selected_items:
+        order_id = str(uuid.uuid4())[:8]
+        total = len(selected_items) * 50  # Dummy pricing
+        save_receipt(order_id, ", ".join(selected_items), total, payment_method)
+        st.success(f"✅ Order placed! ID: {order_id}, Total: ₱{total}")
     else:
-        st.info("No items ordered yet.")
+        st.warning("Please select at least one item.")
 
-# ================================
-# RIGHT SIDE → GENAI + FEEDBACK + REPORTS
-# ================================
-with col2:
-    # GenAI Assistant
-    st.header("🤖 Ask Canteen AI")
-    user_input = st.text_input("Type your question:")
-    if st.button("Ask AI"):
-        if user_input:
-            menu_text = ", ".join(
-                [f"{item} (₱{price})" for cat in menu_data.values() for item, price in cat.items()]
-            )
-            feedback_text = "\n".join(st.session_state.feedback) if st.session_state.feedback else "No feedback yet."
+# --- Feedback Section ---
+st.header("💬 Give Feedback")
+item_choice = st.selectbox("Which item?", menu_items)
+feedback_text = st.text_area("Your feedback:")
 
-            try:
-                response = client.chat.completions.create(
-                    model="llama-3.1-8b-instant",   # ✅ Groq model
-                    messages=[
-                        {"role": "system", "content": f"""
-                        You are a friendly school canteen assistant.
-                        Menu: {menu_text}.
-                        Feedback: {feedback_text}.
-                        - Suggest combo meals and budget-friendly options.
-                        - Answer menu questions.
-                        - Summarize what students think about items if asked.
-                        """},
-                        {"role": "user", "content": user_input}
-                    ]
-                )
-                st.write("*AI:*", response.choices[0].message.content)
-            except Exception as e:
-                st.error(f"⚠️ AI model error: {e}")
-
-    # Feedback
-    st.subheader("💬 Give Feedback")
-    feedback_text = st.text_area("What do you think about the canteen system?")
-    if st.button("Submit Feedback"):
-        if feedback_text:
-            st.session_state.feedback.append(feedback_text)
-            pd.DataFrame(st.session_state.feedback, columns=["feedback"]).to_csv("feedback.csv", index=False)
-            st.success("✅ Feedback recorded, thank you!")
-
-    if st.session_state.feedback:
-        st.write("### 📜 Previous Feedback (Anonymous)")
-        for fb in st.session_state.feedback[-5:]:
-            st.info(f"💭 {fb}")
-
-    # Sales Report (₱ per item)
-    st.subheader("📈 Sales Report - Total Revenue per Item")
-    if os.path.exists("receipts.csv"):
-        all_receipts = pd.read_csv("receipts.csv")
-
-        # Expand receipts into individual items
-        rows = []
-        for _, row in all_receipts.iterrows():
-            items = row["items"].split(", ")
-            for it in items:
-                # get price from menu
-                for cat in menu_data.values():
-                    if it in cat:
-                        rows.append({"Item": it, "Total": cat[it]})
-        sales_df = pd.DataFrame(rows)
-        report = sales_df.groupby("Item")["Total"].sum().sort_values(ascending=False)
-
-        fig, ax = plt.subplots()
-        report.plot(kind="bar", ax=ax)
-        ax.set_ylabel("₱ Sales")
-        ax.set_title("Revenue per Item")
-        st.pyplot(fig)
+if st.button("Submit Feedback"):
+    if feedback_text.strip():
+        save_feedback(item_choice, feedback_text)
+        st.success("✅ Feedback saved to Snowflake!")
     else:
-        st.info("No sales recorded yet.")
+        st.warning("Please write something before submitting.")
+
+# --- Show Feedbacks ---
+st.subheader("📊 Feedback Records")
+feedback_df = load_feedbacks()
+st.dataframe(feedback_df)
+
+# --- Sales Report ---
+st.subheader("📈 Sales Report")
+sales_df = load_sales()
+st.dataframe(sales_df)
