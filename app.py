@@ -56,7 +56,7 @@ def save_receipt(order_id, item, total, payment_method, details=""):
 def load_sales():
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT items, total, payment_method, timestamp FROM receipts")
+    cur.execute("SELECT item, total, payment_method, timestamp FROM receipts")
     rows = cur.fetchall()
     cur.close()
     conn.close()
@@ -215,8 +215,8 @@ sales_df = load_sales()
 if not sales_df.empty:
     item_to_category = {
         item: cat
-        for cat, items in menu_data.items()
-        for item in items.keys()
+        for cat, item in menu_data.item()
+        for item in item.keys()
     }
 
     sales_df["Category"] = sales_df["Item"].map(item_to_category)
@@ -231,5 +231,6 @@ if not sales_df.empty:
     st.pyplot(fig, use_container_width=False)
 else:
     st.info("No sales recorded yet.")
+
 
 
