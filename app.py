@@ -56,7 +56,7 @@ def load_sales():
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return pd.DataFrame(rows, columns=["Items", "Total", "Payment Method", "Timestamp"]) if rows else pd.DataFrame(columns=["Items", "Total", "Payment Method", "Timestamp"])
+    return pd.DataFrame(rows, columns=["items", "total", "payment method", "timestamp"]) if rows else pd.DataFrame(columns=["items", "total", "payment method", "timestamp"])
 
 # ----------------- MENU DATA -----------------
 menu_data = {
@@ -215,3 +215,4 @@ if not sales_df.empty:
     st.pyplot(fig)
 else:
     st.info("No sales records available yet.")
+
