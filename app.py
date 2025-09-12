@@ -205,7 +205,7 @@ st.subheader("📈 Sales Report by Category")
 
 sales_df = load_sales()   # already a DataFrame
 
-if not sales_df.empty:   # ✅ safe check for DataFrame
+if not sales_df.empty:
     # Map each item to its category
     item_to_category = {
         item: cat
@@ -213,14 +213,14 @@ if not sales_df.empty:   # ✅ safe check for DataFrame
         for item in items.keys()
     }
 
-    # ✅ Use correct column name "Items"
-    sales_df["Category"] = sales_df["Items"].map(item_to_category)
+    # ✅ Use "Item" not "Items"
+    sales_df["Category"] = sales_df["Item"].map(item_to_category)
 
     # Group sales by category
     category_sales = sales_df.groupby("Category")["Total"].sum().reset_index()
 
     # Plot smaller graph
-    fig, ax = plt.subplots(figsize=(4, 2))  # ✅ compact chart
+    fig, ax = plt.subplots(figsize=(4, 2))
     ax.bar(category_sales["Category"], category_sales["Total"])
     ax.set_xlabel("Category")
     ax.set_ylabel("Total Sales (₱)")
