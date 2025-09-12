@@ -203,10 +203,9 @@ else:
 # ----------------- SALES REPORT -----------------
 st.subheader("📈 Sales Report by Category")
 
-sales = load_sales()
-if sales and len(sales) > 0:   # ✅ safer check
-    sales_df = pd.DataFrame(sales, columns=["items", "total", "timestamp"])
+sales_df = load_sales()   # already a DataFrame
 
+if not sales_df.empty:   # ✅ safe check for DataFrame
     # Map each item to its category
     item_to_category = {
         item: cat
@@ -220,7 +219,7 @@ if sales and len(sales) > 0:   # ✅ safer check
     category_sales = sales_df.groupby("Category")["total"].sum().reset_index()
 
     # Plot smaller graph
-    fig, ax = plt.subplots(figsize=(4,2))  # ✅ compact chart
+    fig, ax = plt.subplots(figsize=(4, 2))  # ✅ compact chart
     ax.bar(category_sales["Category"], category_sales["total"])
     ax.set_xlabel("Category")
     ax.set_ylabel("Total Sales (₱)")
