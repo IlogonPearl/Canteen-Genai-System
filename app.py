@@ -213,6 +213,7 @@ if not sales_df.empty:   # ✅ safe check for DataFrame
         for item in items.keys()
     }
 
+    # ✅ Fix column name: "item" instead of "items"
     sales_df["Category"] = sales_df["item"].map(item_to_category)
 
     # Group sales by category
@@ -227,4 +228,3 @@ if not sales_df.empty:   # ✅ safe check for DataFrame
     st.pyplot(fig, use_container_width=False)
 else:
     st.info("No sales recorded yet.")
-
