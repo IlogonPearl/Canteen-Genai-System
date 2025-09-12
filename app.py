@@ -213,15 +213,15 @@ if not sales_df.empty:   # ✅ safe check for DataFrame
         for item in items.keys()
     }
 
-    # ✅ Fix column name: "item" instead of "items"
-    sales_df["Category"] = sales_df["item"].map(item_to_category)
+    # ✅ Use correct column name "Items"
+    sales_df["Category"] = sales_df["Items"].map(item_to_category)
 
     # Group sales by category
-    category_sales = sales_df.groupby("Category")["total"].sum().reset_index()
+    category_sales = sales_df.groupby("Category")["Total"].sum().reset_index()
 
     # Plot smaller graph
     fig, ax = plt.subplots(figsize=(4, 2))  # ✅ compact chart
-    ax.bar(category_sales["Category"], category_sales["total"])
+    ax.bar(category_sales["Category"], category_sales["Total"])
     ax.set_xlabel("Category")
     ax.set_ylabel("Total Sales (₱)")
     ax.set_title("Sales by Category")
