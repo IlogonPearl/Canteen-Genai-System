@@ -214,7 +214,7 @@ sales_df = load_sales()
 
 if not sales_df.empty:
     items_to_category = {
-        items: cat
+        item: cat
         for cat, items in menu_data.items()
         for item in items.keys()
     }
@@ -231,6 +231,7 @@ if not sales_df.empty:
     st.pyplot(fig, use_container_width=False)
 else:
     st.info("No sales recorded yet.")
+
 
 
 
