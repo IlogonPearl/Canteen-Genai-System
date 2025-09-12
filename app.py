@@ -200,20 +200,35 @@ if not feedback_df.empty:
 else:
     st.info("No feedback available yet.")
 
-# ---------- SALES REPORT ----------
-st.subheader("📊 Sales Report")
-sales_df = load_sales()
-if not sales_df.empty:
-    st.dataframe(sales_df)
+# ----------------- SALES REPORT -----------------
+st.subheader("📈 Sales Report by Category")
 
-    # Bar chart for sales
-    sales_summary = sales_df.groupby("Items")["Total"].sum()
-    fig, ax = plt.subplots(figsize=(4,3))
-    sales_summary.plot(kind="bar", ax=ax)
+sales = load_sales()
+if sales:
+    sales_df = pd.DataFrame(sales, columns=["items", "total", "timestamp"])
+
+    # Map each item to its category
+    item_to_category = {
+        item: cat
+        for cat, items in menu_data.items()
+        for item in items.keys()
+    }
+
+    sales_df["Category"] = sales_df["items"].map(item_to_category)
+
+    # Group sales by category
+    category_sales = sales_df.groupby("Category")["total"].sum().reset_index()
+
+    # Plot smaller graph
+    fig, ax = plt.subplots(figsize=(4,2))  # compact graph
+    ax.bar(category_sales["Category"], category_sales["total"])
+    ax.set_xlabel("Category")
     ax.set_ylabel("Total Sales (₱)")
-    ax.set_title("Sales per Item")
-    st.pyplot(fig)
+    ax.set_title("Sales by Category")
+    st.pyplot(fig, use_container_width=False)
 else:
-    st.info("No sales records available yet.")
+    st.info("No sales recorded yet.")
+
+
 
 
