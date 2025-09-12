@@ -213,7 +213,7 @@ if not sales_df.empty:   # ✅ safe check for DataFrame
         for item in items.keys()
     }
 
-    sales_df["Category"] = sales_df["items"].map(item_to_category)
+    sales_df["Category"] = sales_df["item"].map(item_to_category)
 
     # Group sales by category
     category_sales = sales_df.groupby("Category")["total"].sum().reset_index()
@@ -227,3 +227,4 @@ if not sales_df.empty:   # ✅ safe check for DataFrame
     st.pyplot(fig, use_container_width=False)
 else:
     st.info("No sales recorded yet.")
+
