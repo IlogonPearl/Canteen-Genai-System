@@ -208,11 +208,12 @@ if not sales_df.empty:
 
     # Bar chart for sales
     sales_summary = sales_df.groupby("Items")["Total"].sum()
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(4,3))
     sales_summary.plot(kind="bar", ax=ax)
     ax.set_ylabel("Total Sales (₱)")
     ax.set_title("Sales per Item")
     st.pyplot(fig)
 else:
     st.info("No sales records available yet.")
+
 
