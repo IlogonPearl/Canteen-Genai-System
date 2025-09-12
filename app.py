@@ -204,14 +204,46 @@ else:
 # ---------- SALES REPORT ----------
 st.subheader("📊 Sales Report")
 sales_df = load_sales()
+
 if not sales_df.empty:
     st.dataframe(sales_df)
 
-    sales_summary = sales_df.groupby("items")["total"].sum()
+    # map each item to its category
+    item_to_category = {}
+    for category, items in menu_data.items():
+        for item in items.keys():
+            item_to_category[item] = category
+
+    # Expand "items" column into individual items
+    expanded_rows = []
+    for _, row in sales_df.iterrows():
+        for entry in row["items"].split(","):
+            entry = entry.strip()
+            if "x" in entry:
+                item, qty = entry.split("x")
+                item = item.strip()
+                qty = int(qty)
+            else:
+                item, qty = entry, 1
+            expanded_rows.append({
+                "item": item,
+                "qty": qty,
+                "total": row["total"],
+                "payment_method": row["payment_method"],
+                "timestamp": row["timestamp"],
+                "category": item_to_category.get(item, "Other")
+            })
+
+    expanded_df = pd.DataFrame(expanded_rows)
+
+    # Sales per category
+    category_sales = expanded_df.groupby("category")["total"].sum()
+
     fig, ax = plt.subplots(figsize=(5,5))
-    sales_summary.plot(kind="bar", ax=ax)
+    category_sales.plot(kind="bar", ax=ax)
     ax.set_ylabel("Total Sales (₱)")
-    ax.set_title("Sales per Item")
+    ax.set_title("Sales per Category")
     st.pyplot(fig)
+
 else:
     st.info("No sales records available yet.")
