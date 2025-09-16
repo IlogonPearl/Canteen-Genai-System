@@ -23,12 +23,12 @@ def save_feedback(item, feedback, rating, user_id=None):
     cur = conn.cursor()
     if user_id is not None:
         cur.execute(
-            "INSERT INTO feedbacks (item, feedback, rating, user_id) VALUES (?, ?, ?, ?)",
+            "INSERT INTO feedbacks (item, feedback, rating, user_id) VALUES (%s, %s, %s, %s)",
             (item, feedback, rating, user_id),
         )
     else:
         cur.execute(
-            "INSERT INTO feedbacks (item, feedback, rating) VALUES (?, ?, ?)",
+            "INSERT INTO feedbacks (item, feedback, rating) VALUES (%s, %s, %s)",
             (item, feedback, rating),
         )
     conn.commit()
@@ -52,12 +52,12 @@ def save_receipt(order_id, items, total, payment_method, details="", user_id=Non
     cur = conn.cursor()
     if user_id is not None:
         cur.execute(
-            "INSERT INTO receipts (order_id, items, total, payment_method, details, user_id) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO receipts (order_id, items, total, payment_method, details, user_id) VALUES (%s, %s, %s, %s, %s, %s)",
             (order_id, items, total, payment_method, details, user_id),
         )
     else:
         cur.execute(
-            "INSERT INTO receipts (order_id, items, total, payment_method, details) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO receipts (order_id, items, total, payment_method, details) VALUES (%s, %s, %s, %s, %s)",
             (order_id, items, total, payment_method, details),
         )
     conn.commit()
@@ -134,13 +134,7 @@ with col_left:
                     model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": prompt}],
                 )
-                # Depending on Groq client version, adjust if needed
-                answer = (
-                    response.choices[0].message.content
-                    if hasattr(response.choices[0], "message")
-                    else response.choices[0].text
-                )
-                st.success(answer)
+                st.success(response.choices[0].message.content)
             except Exception as e:
                 st.error(f"⚠️ AI unavailable: {e}")
 
@@ -246,16 +240,13 @@ if not sales_df.empty:
             expanded_rows.append({
                 "item": item,
                 "qty": qty,
-                "total": row["total"],
+                "total": float(row["total"]),  # ensure numeric
                 "payment_method": row["payment_method"],
                 "timestamp": row["timestamp"],
                 "category": item_to_category.get(item, "Other")
             })
 
     expanded_df = pd.DataFrame(expanded_rows)
-
-    # 🔧 Ensure numeric for plotting
-    expanded_df["total"] = pd.to_numeric(expanded_df["total"], errors="coerce")
 
     # Sales per category
     category_sales = expanded_df.groupby("category")["total"].sum()
