@@ -18,13 +18,19 @@ def get_connection():
     )
 
 # ----------------- SAVE FEEDBACK -----------------
-def save_feedback(item, feedback, rating):
+def save_feedback(item, feedback, rating, user_id=None):
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO feedbacks (item, feedback, rating) VALUES (%s, %s, %s)",
-        (item, feedback, rating),
-    )
+    if user_id is not None:
+        cur.execute(
+            "INSERT INTO feedbacks (item, feedback, rating, user_id) VALUES (?, ?, ?, ?)",
+            (item, feedback, rating, user_id),
+        )
+    else:
+        cur.execute(
+            "INSERT INTO feedbacks (item, feedback, rating) VALUES (?, ?, ?)",
+            (item, feedback, rating),
+        )
     conn.commit()
     cur.close()
     conn.close()
@@ -41,13 +47,19 @@ def load_feedbacks():
         if rows else pd.DataFrame(columns=["item", "feedback", "rating", "timestamp"])
 
 # ----------------- SAVE RECEIPT -----------------
-def save_receipt(order_id, items, total, payment_method, details=""):
+def save_receipt(order_id, items, total, payment_method, details="", user_id=None):
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO receipts (order_id, items, total, payment_method, details) VALUES (%s, %s, %s, %s, %s)",
-        (order_id, items, total, payment_method, details),
-    )
+    if user_id is not None:
+        cur.execute(
+            "INSERT INTO receipts (order_id, items, total, payment_method, details, user_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (order_id, items, total, payment_method, details, user_id),
+        )
+    else:
+        cur.execute(
+            "INSERT INTO receipts (order_id, items, total, payment_method, details) VALUES (?, ?, ?, ?, ?)",
+            (order_id, items, total, payment_method, details),
+        )
     conn.commit()
     cur.close()
     conn.close()
@@ -122,7 +134,13 @@ with col_left:
                     model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": prompt}],
                 )
-                st.success(response.choices[0].message.content)
+                # Depending on Groq client version, adjust if needed
+                answer = (
+                    response.choices[0].message.content
+                    if hasattr(response.choices[0], "message")
+                    else response.choices[0].text
+                )
+                st.success(answer)
             except Exception as e:
                 st.error(f"⚠️ AI unavailable: {e}")
 
@@ -235,6 +253,9 @@ if not sales_df.empty:
             })
 
     expanded_df = pd.DataFrame(expanded_rows)
+
+    # 🔧 Ensure numeric for plotting
+    expanded_df["total"] = pd.to_numeric(expanded_df["total"], errors="coerce")
 
     # Sales per category
     category_sales = expanded_df.groupby("category")["total"].sum()
